@@ -1,0 +1,6 @@
+{
+  "name": "PCMarket",
+  "description": "Интернет-магазин компьютерных комплектующих и готовых решений PCMarket в высокотехнологичном футуристичном стиле.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

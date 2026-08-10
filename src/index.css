@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* Tech Cut-Corners & Chamfers matching reference image */
+  .clip-chamfer-br {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+  }
+
+  .clip-chamfer-tl-br {
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  }
+
+  .clip-chamfer-tr-bl {
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  }
+
+  .clip-slant-lg {
+    clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+  }
+
+  .clip-badge-slant {
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  }
+
+  .clip-button-tech {
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+
+  .clip-header-cut {
+    clip-path: polygon(0 0, 100% 0, calc(100% - 20px) 100%, 0 100%);
+  }
+
+  .clip-dialog-tech {
+    clip-path: polygon(24px 0, 100% 0, 100% calc(100% - 24px), calc(100% - 24px) 100%, 0 100%, 0 24px);
+  }
+
+  /* Patterns & Micro Details */
+  .bg-dot-matrix {
+    background-image: radial-gradient(rgba(15, 17, 21, 0.18) 1.5px, transparent 1.5px);
+    background-size: 12px 12px;
+  }
+
+  .bg-dot-matrix-dark {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1.5px, transparent 1.5px);
+    background-size: 12px 12px;
+  }
+
+  .bg-dot-matrix-orange {
+    background-image: radial-gradient(rgba(255, 85, 0, 0.3) 1.5px, transparent 1.5px);
+    background-size: 10px 10px;
+  }
+
+  .bg-tech-grid {
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .bg-diagonal-stripes-orange {
+    background: repeating-linear-gradient(
+      -45deg,
+      #FF5500,
+      #FF5500 12px,
+      #E04B00 12px,
+      #E04B00 24px
+    );
+  }
+
+  .bg-diagonal-stripes-dark {
+    background: repeating-linear-gradient(
+      -45deg,
+      #0F1115,
+      #0F1115 12px,
+      #1B1E24 12px,
+      #1B1E24 24px
+    );
+  }
+
+  .bg-diagonal-lines {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 85, 0, 0.08) 0,
+      rgba(255, 85, 0, 0.08) 1px,
+      transparent 1px,
+      transparent 8px
+    );
+  }
+
+  .glow-orange-sm {
+    box-shadow: 0 0 12px rgba(255, 85, 0, 0.25);
+  }
+
+  .glow-orange-md {
+    box-shadow: 0 0 24px rgba(255, 85, 0, 0.35);
+  }
+
+  .glow-orange-lg {
+    box-shadow: 0 0 40px rgba(255, 85, 0, 0.45);
+  }
+}
+
+/* Custom Tech Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff5500;
+}
