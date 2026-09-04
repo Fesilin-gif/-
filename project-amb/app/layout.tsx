@@ -64,7 +64,14 @@ const MOTION_FLAG = `try{if(!matchMedia('(prefers-reduced-motion: reduce)').matc
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={`${serif.variable} ${sans.variable}`}>
+    /* suppressHydrationWarning — класс .js ставит инлайн-скрипт ниже,
+       до гидратации, поэтому разметка сервера и клиента здесь расходится
+       намеренно. */
+    <html
+      lang="ru"
+      className={`${serif.variable} ${sans.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: MOTION_FLAG }} />
       </head>
