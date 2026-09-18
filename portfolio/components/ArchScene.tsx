@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import Medallions from '@/components/Medallions';
+import { windowViewFor } from '@/lib/projects';
 import {
   ARCH,
   LANDSCAPE,
@@ -33,10 +34,22 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
  * источник прогресса: ничего не «проигрывается», поэтому сцена
  * одинаково идёт вперёд и назад и останавливается там, где остановили.
  *
- * Слои лежат снизу вверх: панорама, арка, интерфейс. Панорама уже
- * НИЖЕ арки — когда появится версия арки с прозрачным проёмом, её
- * достаточно положить на место нынешнего файла, и панорама начнёт
- * проглядывать сквозь проём без переделки сцены.
+ * Слои лежат снизу вверх:
+ *   1. .layer--landscape — свободная панорама первого экрана: едет и
+ *      тает по мере отъезда камеры (transform на transform, чистая
+ *      геометрия из lib/scene.ts).
+ *   2. .window (внутри .layer--arch) — вид в проёме: неподвижный CSS-
+ *      фон, обрезанный точной маской проёма (arch-opening-mask.png),
+ *      проявляется тем же движением, что и арка сверху.
+ *   3. .arch-figure (тоже внутри .layer--arch) — передний план: PNG
+ *      с прозрачным проёмом и прозрачным полем вокруг. Камень и
+ *      девушка непрозрачны, всё остальное честно показывает то, что
+ *      положено слоем 2.
+ *
+ * .window и .arch-figure — родные дети одного контейнера (.layer--arch)
+ * с ОДНИМ transform на двоих, который ставит компонент. Поэтому маска
+ * проёма всегда пиксель в пиксель совпадает с самой аркой, на любом
+ * масштабе экрана, без отдельного пересчёта для вложенных слоёв.
  *
  * Вся арифметика вынесена в lib/scene.ts. Здесь — только измерения
  * реального экрана и запись результата в transform.
@@ -46,19 +59,26 @@ export default function ArchScene() {
   const stageRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const landscapeRef = useRef<HTMLImageElement>(null);
-  const archRef = useRef<HTMLImageElement>(null);
+  const archFigureRef = useRef<HTMLDivElement>(null);
   const choiceRef = useRef<HTMLDivElement>(null);
 
   const [selected, setSelected] = useState<string | null>(null);
+
+  /* Вид в проёме следует за выбранным медальоном. Пока ни у одного
+     проекта нет своего кадра для окна, windowViewFor всегда отдаёт
+     вид по умолчанию — переключение готово и работает, только сегодня
+     оно ничего не меняет визуально: подставлять пока нечего. */
+  const view = useMemo(() => windowViewFor(selected), [selected]);
+  const focus = view.focus ?? { x: 0.5, y: 0.5 };
 
   useIsomorphicLayoutEffect(() => {
     const scene = sceneRef.current;
     const stage = stageRef.current;
     const frame = frameRef.current;
     const landscape = landscapeRef.current;
-    const arch = archRef.current;
+    const archFigure = archFigureRef.current;
     const choice = choiceRef.current;
-    if (!scene || !stage || !frame || !landscape || !arch || !choice) return;
+    if (!scene || !stage || !frame || !landscape || !archFigure || !choice) return;
 
     /* Тот же флаг, по которому CSS выбирает режим сцены: класс .js
        ставит синхронный скрипт в <head>, и только если движение
@@ -78,21 +98,28 @@ export default function ArchScene() {
       /* Хвост прокрутки после SETTLE_AT — собранная сцена стоит на месте. */
       const progress = clamp(raw / SETTLE_AT);
 
+      const archIn = phase(progress, PHASE.archIn);
+
       const rect = landscapeRectAt(progress, layout);
       landscape.style.transform = transformFor(rect, LANDSCAPE);
-      landscape.style.opacity = (1 - phase(progress, PHASE.landscapeOut)).toFixed(3);
+      /* Панорама первого экрана уходит тем же окном, каким проявляются
+         арка и вид в проёме, — единая точка стыка вместо двух
+         рассинхронизированных, поэтому используем archIn напрямую,
+         а не отдельную фазу. */
+      landscape.style.opacity = (1 - archIn).toFixed(3);
       /* Растушёвка идёт раньше прозрачности: как только кадр отходит
          от краёв экрана, мягкая граница не даёт ему читаться вырезкой,
          и заодно прячет расхождение двух иллюстраций. */
       landscape.style.setProperty('--feather', phase(progress, PHASE.feather).toFixed(3));
 
-      const archIn = phase(progress, PHASE.archIn);
-      arch.style.transform = transformFor(layout.arch, ARCH, lerp(1.035, 1, archIn));
-      arch.style.opacity = archIn.toFixed(3);
+      /* Один transform на фигуру арки — им же делят window (вид
+         в проёме) и передний план (камень и девушка), поэтому маска
+         проёма всегда точно на месте, каким бы ни был масштаб. */
+      archFigure.style.transform = transformFor(layout.arch, ARCH, lerp(1.035, 1, archIn));
+      archFigure.style.opacity = archIn.toFixed(3);
 
       const reveal = phase(progress, PHASE.reveal);
       stage.style.setProperty('--reveal', reveal.toFixed(3));
-      stage.style.setProperty('--hint', (1 - phase(progress, PHASE.hintOut)).toFixed(3));
 
       /* Пока медальоны не проявились, они не должны ловить фокус:
          иначе табуляция уводит на невидимые кнопки. */
@@ -157,7 +184,7 @@ export default function ArchScene() {
       style={{ '--scene-travel': SCENE_TRAVEL_VH } as React.CSSProperties}
     >
       <div className="stage" ref={stageRef}>
-        {/* ——— Слой 1: панорама ——————————————————————————— */}
+        {/* ——— Слой 1: панорама первого экрана ————————————— */}
         <div className="layer layer--landscape" aria-hidden="true">
           <img
             className="layer__img"
@@ -177,24 +204,36 @@ export default function ArchScene() {
           />
         </div>
 
-        {/* ——— Слой 2: арка ————————————————————————————————
-            Файл непрозрачный, его белый фон и гасит панораму в конце
-            отъезда. С прозрачным проёмом здесь ничего не меняется. */}
-        <div className="layer layer--arch">
+        {/* ——— Слой 2: фигура арки ————————————————————————
+            .window и .arch-figure делят один transform (ставит
+            компонент на сам .layer--arch), поэтому маска проёма
+            всегда совпадает с аркой пиксель в пиксель — в любом
+            режиме, статичном или анимированном. */}
+        <div
+          className="layer layer--arch"
+          ref={archFigureRef}
+          style={
+            {
+              '--nat-w': `${ARCH.width}px`,
+              '--nat-h': `${ARCH.height}px`,
+            } as React.CSSProperties
+          }
+        >
+          <div
+            className="window"
+            aria-hidden="true"
+            style={{
+              backgroundImage: `url(${view.src})`,
+              backgroundPosition: `${focus.x * 100}% ${focus.y * 100}%`,
+            }}
+          />
           <img
-            className="layer__img"
-            ref={archRef}
+            className="arch-figure"
             src={ARCH.src}
             alt="Девушка в длинном платье сидит на подоконнике готической арки и смотрит на долину с рекой и городом на холме"
             width={ARCH.width}
             height={ARCH.height}
             decoding="async"
-            style={
-              {
-                '--nat-w': `${ARCH.width}px`,
-                '--nat-h': `${ARCH.height}px`,
-              } as React.CSSProperties
-            }
           />
         </div>
 
@@ -212,10 +251,6 @@ export default function ArchScene() {
         <div className="stage__choice" id="choice" ref={choiceRef}>
           <Medallions selected={selected} onSelect={setSelected} />
         </div>
-
-        <p className="stage__hint" aria-hidden="true">
-          Прокрутите
-        </p>
       </div>
     </div>
   );

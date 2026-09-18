@@ -6,6 +6,8 @@
    своими названиями, описаниями и ссылками.
    ============================================================ */
 
+import { DEFAULT_WINDOW_VIEW, type WindowView } from './scene';
+
 export type ProjectMedallion = {
   /** Картинка внутри круга. Пока не задана — рисуется живописная заглушка. */
   src: string;
@@ -43,13 +45,18 @@ export type Project = {
   liveHref?: string | null;
 
   medallion?: ProjectMedallion;
-};
 
-/**
- * Подпись на месте незаполненного названия. Это не название проекта,
- * а видимая метка-заглушка: пока она на экране, слот не готов.
- */
-export const EMPTY_SLOT_LABEL = 'Слот проекта';
+  /**
+   * Что показать в проёме арки, если выбран этот медальон. Не задано —
+   * в окне остаётся вид по умолчанию (DEFAULT_WINDOW_VIEW в lib/scene.ts).
+   * Сегодня это поле не заполнено ни у одного слота: своего изображения
+   * для проёма ни у одного проекта пока нет, придумывать его не стал.
+   * Появится кадр — впишите сюда { src, width, height } (и focus, если
+   * важная деталь не по центру), выбор медальона переключит вид сам,
+   * никаких других правок не потребуется.
+   */
+  windowView?: WindowView | null;
+};
 
 /**
  * Слоты портфолио.
@@ -64,5 +71,20 @@ export const PROJECTS: readonly Project[] = [
   { id: 'slot-03', title: null, summary: null, caseHref: null },
 ] as const;
 
-/** Номер медальона в ряду — «01», «02», … */
+/** Номер медальона в ряду — «01», «02», … Используется только для
+ *  доступного имени (aria-label) незаполненных слотов, на экране
+ *  текстом не показывается. */
 export const ordinal = (index: number) => String(index + 1).padStart(2, '0');
+
+/**
+ * Что показать в проёме арки для выбранного медальона.
+ *
+ * У проекта нет своего windowView (сегодня — ни у одного) → в окне
+ * остаётся вид по умолчанию. Выбор медальона уже переключает вид,
+ * менять код при добавлении первого настоящего кадра не потребуется —
+ * только заполнить windowView у нужного проекта в PROJECTS.
+ */
+export function windowViewFor(selectedId: string | null): WindowView {
+  const project = selectedId ? PROJECTS.find((p) => p.id === selectedId) : undefined;
+  return project?.windowView ?? DEFAULT_WINDOW_VIEW;
+}

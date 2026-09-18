@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 
-import { EMPTY_SLOT_LABEL, PROJECTS, ordinal, type Project } from '@/lib/projects';
+import { PROJECTS, ordinal, type Project } from '@/lib/projects';
 
 type Props = {
-  /** id выбранного медальона — пока кейсов нет, выбор только визуальный. */
+  /** id выбранного медальона: помимо визуальной отметки, определяет
+   *  вид в проёме арки (см. ArchScene). */
   selected: string | null;
   onSelect: (id: string) => void;
 };
@@ -50,7 +51,11 @@ function Medallion({
   selected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const label = project.title ?? `${EMPTY_SLOT_LABEL} ${ordinal(index)}`;
+  /* Доступное имя нужно даже пустому слоту — иначе кнопка для
+     скринридера безымянна. Порядковый номер, а не выдуманное
+     название: единственное, что о слоте известно наверняка. */
+  const label = project.title ?? `Проект ${ordinal(index)}`;
+  const hasCaption = Boolean(project.title || project.summary);
 
   const body = (
     <>
@@ -76,10 +81,12 @@ function Medallion({
         <span className="medallion__ring" aria-hidden="true" />
       </span>
 
-      <span className="medallion__caption">
-        <span className="medallion__title">{project.title ?? EMPTY_SLOT_LABEL}</span>
-        {project.summary ? <span className="medallion__note">{project.summary}</span> : null}
-      </span>
+      {hasCaption ? (
+        <span className="medallion__caption">
+          {project.title ? <span className="medallion__title">{project.title}</span> : null}
+          {project.summary ? <span className="medallion__note">{project.summary}</span> : null}
+        </span>
+      ) : null}
     </>
   );
 

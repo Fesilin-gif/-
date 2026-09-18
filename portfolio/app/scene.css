@@ -41,6 +41,11 @@
 .layer--arch {
   order: 3;
   max-width: 640px;
+  /* .window и .arch-figure внутри стоят на position:absolute — без
+     этого якоря (и без размера, который в статичном режиме задаёт
+     только aspect-ratio) им не от чего отсчитывать свои 100%. */
+  position: relative;
+  aspect-ratio: 1122 / 1402;
 }
 
 .stage__choice {
@@ -52,9 +57,39 @@
   height: auto;
 }
 
-/* Середина сетки и подсказка нужны только залипающей сцене */
-.stage__frame,
-.stage__hint {
+/* .window (вид в проёме) и .arch-figure (девушка и камень) —
+   в обоих режимах просто заполняют .layer--arch целиком: в статичном
+   это его CSS-размер (100% ширины блока, высота — по aspect-ratio),
+   в анимированном — натуральный размер файла арки, который несёт сам
+   .layer--arch (--nat-w/--nat-h). Проценты одинаково верны в обоих
+   случаях, поэтому отдельных правил под .js не нужно. */
+.window,
+.arch-figure {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+
+.window {
+  overflow: hidden;
+  background-repeat: no-repeat;
+  background-size: cover;
+  /* Маска — тот же файл, что рисует непрозрачные камень и девушку
+     в arch-transparent.png, но инвертированный: белое и непрозрачное
+     только внутри проёма (силуэт девушки из маски вычтен — она поверх
+     закрывает вид собой, а не своей тенью на маске). */
+  -webkit-mask-image: url('/media/arch-opening-mask.png');
+  mask-image: url('/media/arch-opening-mask.png');
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* Середина сетки нужна только залипающей сцене */
+.stage__frame {
   display: none;
 }
 
@@ -125,6 +160,20 @@
 
 .js .layer--arch {
   z-index: 1;
+  /* Перекрывает inset:0 из общего .js .layer: фигура арки несёт СВОЙ
+     transform (ставит компонент), поэтому ей нужен явный натуральный
+     размер, а не растяжение на весь экран. .window и .arch-figure
+     внутри остаются на простых 100% — их не трогаем. */
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: auto;
+  width: var(--nat-w);
+  height: var(--nat-h);
+  aspect-ratio: auto;
+  transform-origin: 0 0;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
 .js .layer__img {
@@ -169,27 +218,6 @@
 .js .stage__choice {
   opacity: var(--reveal, 0);
   transform: translateY(calc((1 - var(--reveal, 0)) * 16px));
-}
-
-.js .stage__hint {
-  display: block;
-  position: absolute;
-  z-index: 2;
-  left: 0;
-  right: 0;
-  bottom: clamp(14px, 3vh, 30px);
-  margin: 0;
-  text-align: center;
-  font-size: var(--fs-label);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #fff;
-  /* Подсказка лежит на светлой траве — держим её тенью, а не плашкой */
-  text-shadow:
-    0 1px 2px rgba(23, 23, 20, 0.55),
-    0 0 16px rgba(23, 23, 20, 0.5);
-  opacity: var(--hint, 1);
-  pointer-events: none;
 }
 
 /* ——— Медальоны ————————————————————————————————————————— */
