@@ -1,0 +1,370 @@
+/* ============================================================
+   Сцена: отъезд камеры от панорамы к арке
+   ------------------------------------------------------------
+   Два режима, и переключает их класс .js на <html>. Его ставит
+   синхронный скрипт в <head> — и только если движение разрешено.
+
+   Без .js (нет JS или prefers-reduced-motion: reduce) сцена не
+   существует: панорама, арка, заголовок и медальоны просто идут
+   друг за другом обычной страницей. Ничего не прячется, ничего
+   не ждёт прокрутки.
+
+   С .js высокий блок .scene задаёт длину прокрутки, внутри
+   залипает экран .stage, а положение страницы ведёт всю сцену.
+   Значения в transform/opacity пишет ArchScene.tsx.
+   ============================================================ */
+
+/* ——— Статичный режим: он же запасной ————————————————————— */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(28px, 5vw, 56px);
+  padding: clamp(24px, 5vw, 72px) var(--gut) clamp(56px, 9vw, 112px);
+}
+
+.layer {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.layer--landscape {
+  order: 1;
+  max-width: 1400px;
+}
+
+.stage__head {
+  order: 2;
+}
+
+.layer--arch {
+  order: 3;
+  max-width: 640px;
+}
+
+.stage__choice {
+  order: 4;
+}
+
+.layer__img {
+  width: 100%;
+  height: auto;
+}
+
+/* Середина сетки и подсказка нужны только залипающей сцене */
+.stage__frame,
+.stage__hint {
+  display: none;
+}
+
+.stage__head {
+  text-align: center;
+  /* Не в ch: единица считается по шрифту блока, а не заголовка */
+  max-width: min(92vw, 640px);
+}
+
+.stage__title {
+  font-size: var(--fs-title);
+}
+
+/* ——— Режим сцены ——————————————————————————————————————— */
+
+.js .scene {
+  position: relative;
+  /* Длина прокрутки сцены; переменную ставит компонент */
+  height: calc(var(--scene-travel, 300) * 1vh);
+  height: calc(var(--scene-travel, 300) * 1svh);
+}
+
+.js .stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  /* Заголовок / пустая середина под арку / медальоны.
+     Середину измеряет ResizeObserver — из неё берётся вся геометрия. */
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Сбрасываем центрирование статичного режима: середина обязана
+     растянуться на всю свободную высоту, иначе мерить нечего. */
+  align-items: stretch;
+  gap: 0;
+  padding: clamp(18px, 3.4vh, 44px) var(--gut) clamp(20px, 3.6vh, 48px);
+  overflow: hidden;
+  background: var(--canvas);
+}
+
+.js .stage__head {
+  grid-row: 1;
+  justify-self: center;
+  z-index: 2;
+}
+
+.js .stage__frame {
+  display: block;
+  grid-row: 2;
+  min-height: 0;
+  /* Воздух вокруг арки: без него подол платья упирается в медальоны */
+  margin: clamp(6px, 1.2vh, 16px) 0 clamp(16px, 2.8vh, 34px);
+}
+
+.js .stage__choice {
+  grid-row: 3;
+  z-index: 2;
+}
+
+/* Кадры выведены из потока и живут на transform */
+.js .layer {
+  position: absolute;
+  inset: 0;
+  max-width: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.js .layer--arch {
+  z-index: 1;
+}
+
+.js .layer__img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Кадр лежит в натуральном размере, всё остальное делает матрица */
+  width: var(--nat-w);
+  height: var(--nat-h);
+  max-width: none;
+  transform-origin: 0 0;
+  /* До первого кадра сцены оба слоя скрыты: значения ставит
+     layout-эффект, то есть ещё до отрисовки. */
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* Растушёвка краёв панорамы.
+   --feather: 0 — кадр без маски, полный экран; 1 — мягкие края.
+
+   Проценты в размере градиента считаются от сторон кадра, поэтому
+   размер эллипса и точка чёрного едут вместе:
+     75% — эллипс заведомо накрывает углы, маска ничего не делает;
+     55% + чёрное до 20% — край кадра растворяется почти полностью.
+   Промежуточные значения дают ровное нарастание, а не рывок в конце. */
+.js .layer--landscape .layer__img {
+  --feather: 0;
+  -webkit-mask-image: radial-gradient(
+    ellipse calc(75% - var(--feather) * 20%) calc(75% - var(--feather) * 20%) at 50% 50%,
+    #000 calc(100% - var(--feather) * 80%),
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse calc(75% - var(--feather) * 20%) calc(75% - var(--feather) * 20%) at 50% 50%,
+    #000 calc(100% - var(--feather) * 80%),
+    transparent 100%
+  );
+}
+
+/* Заголовок и медальоны появляются в самом конце отъезда */
+.js .stage__head,
+.js .stage__choice {
+  opacity: var(--reveal, 0);
+  transform: translateY(calc((1 - var(--reveal, 0)) * 16px));
+}
+
+.js .stage__hint {
+  display: block;
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: clamp(14px, 3vh, 30px);
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-label);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #fff;
+  /* Подсказка лежит на светлой траве — держим её тенью, а не плашкой */
+  text-shadow:
+    0 1px 2px rgba(23, 23, 20, 0.55),
+    0 0 16px rgba(23, 23, 20, 0.5);
+  opacity: var(--hint, 1);
+  pointer-events: none;
+}
+
+/* ——— Медальоны ————————————————————————————————————————— */
+
+.stage__choice {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.choice__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(16px, 3.2vw, 48px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.choice__item {
+  display: flex;
+}
+
+.medallion {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 6px 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.2vh, 14px);
+  /* Реакция короткая и заканчивается сама: ничего не зациклено */
+  transition: transform 180ms var(--ease-out);
+}
+
+.medallion__disc {
+  position: relative;
+  width: clamp(66px, 10.5vw, 118px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 34% 28%, #fdfbf7 0%, #efe7da 46%, #d9cbb4 100%);
+  box-shadow:
+    0 1px 2px rgba(23, 23, 20, 0.12),
+    0 12px 24px -16px rgba(23, 23, 20, 0.55);
+  transition:
+    box-shadow 180ms var(--ease-out),
+    filter 180ms var(--ease-out);
+}
+
+.medallion__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Пока настоящего кадра нет, место держит номер */
+.medallion__blank {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: clamp(1.25rem, 2.4vw, 1.9rem);
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.medallion__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  box-shadow: inset 0 0 0 4px rgba(254, 254, 254, 0.86);
+  transition: border-color 180ms var(--ease-out);
+}
+
+.medallion__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 18ch;
+}
+
+.medallion__title {
+  font-size: var(--fs-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  transition: color 180ms var(--ease-out);
+}
+
+.medallion__note {
+  font-size: var(--fs-label);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: var(--ink-muted);
+}
+
+/* На узком экране ряд должен оставаться одной строкой */
+@media (max-width: 480px) {
+  .choice__row {
+    gap: 10px;
+  }
+
+  .medallion {
+    max-width: 28vw;
+    padding: 4px 0;
+  }
+
+  .medallion__caption {
+    max-width: 100%;
+  }
+
+  .medallion__title {
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* Наведение — только там, где курсор действительно есть */
+@media (hover: hover) and (pointer: fine) {
+  .medallion:hover {
+    transform: translateY(-6px);
+  }
+
+  .medallion:hover .medallion__disc {
+    filter: brightness(1.05);
+    box-shadow:
+      0 2px 4px rgba(23, 23, 20, 0.14),
+      0 20px 32px -20px rgba(23, 23, 20, 0.6);
+  }
+
+  .medallion:hover .medallion__title {
+    color: var(--ink);
+  }
+}
+
+/* На телефоне роль наведения берёт нажатие */
+@media (hover: none) {
+  .medallion:active .medallion__disc {
+    filter: brightness(1.06);
+  }
+}
+
+.medallion[aria-pressed='true'] .medallion__ring {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 0 0 4px rgba(254, 254, 254, 0.86),
+    0 0 0 1px var(--accent);
+}
+
+.medallion[aria-pressed='true'] .medallion__title {
+  color: var(--ink);
+}
+
+/* ——— Движение выключено ————————————————————————————————
+   Класс .js при reduce не ставится, сцена и так не запускается.
+   Здесь гасим то немногое, что живёт на чистом CSS. */
+@media (prefers-reduced-motion: reduce) {
+  .medallion,
+  .medallion__disc,
+  .medallion__ring,
+  .medallion__title {
+    transition: none;
+  }
+
+  .medallion:hover {
+    transform: none;
+  }
+}
