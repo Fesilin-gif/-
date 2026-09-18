@@ -1,0 +1,92 @@
+/* ============================================================
+   Портфолио — дизайн-система
+   Белый холст, тёмные чернила, антиква на заголовках.
+   Холст намеренно не #ffffff: это фон иллюстрации арки, и сцена
+   обязана попадать в него ровно, иначе по краям кадра виден
+   светлый прямоугольник.
+   ============================================================ */
+
+:root {
+  --canvas: #fefefe;
+  --canvas-2: #f7f5f1;
+
+  --ink: #171714;
+  --ink-2: #23221f;
+  --ink-muted: #6a6861;
+
+  /* Акцент — только линии, номера и метки, текстом не набираем */
+  --accent: #b69a78;
+  --accent-2: #c9b191;
+
+  --rule: rgba(23, 23, 20, 0.14);
+  --rule-soft: rgba(23, 23, 20, 0.08);
+
+  --gut: clamp(18px, 4.5vw, 64px);
+
+  --fs-title: clamp(1.9rem, 5vw, 3.75rem);
+  --fs-body: clamp(0.95rem, 1vw, 1.0625rem);
+  --fs-label: 0.75rem;
+
+  /* Кривые общие для всего интерфейса, своих не изобретаем */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink-2);
+  font-family: var(--font-sans), 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--fs-body);
+  font-weight: 300;
+  line-height: 1.6;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--font-serif), Georgia, 'Times New Roman', serif;
+  font-weight: 300;
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+:where(a, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 5px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--ink);
+  color: var(--canvas);
+  border-radius: 6px;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
