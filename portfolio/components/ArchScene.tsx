@@ -205,7 +205,7 @@ export default function ArchScene() {
           <img
             className="arch-figure"
             src={ARCH.src}
-            alt="Девушка в длинном платье сидит на подоконнике готической арки и смотрит на долину с рекой и городом на холме"
+            alt="Девушка в зелёном платье сидит спиной к зрителю на подоконнике готической арки, глядя в проём наружу"
             width={ARCH.width}
             height={ARCH.height}
             decoding="async"
@@ -251,7 +251,7 @@ export default function ArchScene() {
           <img
             className="rig__figure"
             src={ARCH.src}
-            alt="Девушка в длинном платье сидит на подоконнике готической арки и смотрит на долину с рекой и городом на холме"
+            alt="Девушка в зелёном платье сидит спиной к зрителю на подоконнике готической арки, глядя в проём наружу"
             width={ARCH.width}
             height={ARCH.height}
             decoding="async"
