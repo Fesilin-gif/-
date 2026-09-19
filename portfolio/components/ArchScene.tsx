@@ -6,17 +6,15 @@ import Medallions from '@/components/Medallions';
 import { windowViewFor } from '@/lib/projects';
 import {
   ARCH,
-  HANDOFF_AT,
-  LANDSCAPE,
+  DEFAULT_WINDOW_VIEW,
   PHASE,
   SCENE_TRAVEL_VH,
   SETTLE_AT,
   clamp,
   computeLayout,
-  landscapeRectAt,
-  lerp,
-  maskRectAt,
   phase,
+  placeView,
+  rigRectAt,
   transformFor,
   type SceneLayout,
 } from '@/lib/scene';
@@ -36,60 +34,56 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
  * источник прогресса: ничего не «проигрывается», поэтому сцена
  * одинаково идёт вперёд и назад и останавливается там, где остановили.
  *
- * Это НЕ перекрёстная прозрачность. Панорама первого экрана (слой 1)
- * всегда непрозрачна — она не тускнеет и не белеет ни на одном кадре.
- * Единственное, что с ней происходит, — маска (CSS mask, не opacity),
- * которая идёт в ногу с её собственным transform и стягивается от
- * «весь экран» до точной формы проёма арки. Снаружи маски панорама
- * жёстко обрывается, без полупрозрачного ореола.
+ * Один слой, одна система координат (подробности — в lib/scene.ts,
+ * в шапке файла). Коротко: .rig — контейнер размером с натуральный
+ * кадр арки (1122×1402), внутри него неподвижно (без собственной
+ * анимации) сидят панорама, обрезанная маской точно по форме проёма,
+ * и сама фигура арки поверх. Единственное, что движется, — transform
+ * самого .rig, который каждый кадр прокрутки пишет этот компонент.
+ * Масштабируя .rig, мы масштабируем панораму, её маску и фигуру арки
+ * ОДНОЙ И ТОЙ ЖЕ матрицей — рассинхронизации быть не может.
  *
- * Слои лежат снизу вверх:
- *   1. .layer--landscape — панорама. Едет по transform (отъезд камеры,
- *      landscapeRectAt) и одновременно сжимается маской (maskRectAt)
- *      до формы проёма. Непрозрачность всегда 1.
- *   2. .arch-figure — передний план: девушка и камень, PNG с
- *      прозрачным проёмом. Проявляется обычной прозрачностью, но
- *      коротко и ближе к концу отъезда — когда маска панорамы уже
- *      почти стянулась до формы проёма, открытого пейзажа вокруг
- *      почти не остаётся, и прозрачность не читается как высветление.
- *   3. .window — вид в проёме про запас: неподвижный CSS-фон под той
- *      же маской. Скрыт весь отъезд; включается ровно в момент
- *      HANDOFF_AT, когда маска панорамы уже точно совпала с формой
- *      проёма — оба слоя в этот момент показывают одинаковые пиксели,
- *      переключение не видно. Дальше именно window меняет вид по
- *      выбору медальона (слой 1 — всегда LANDSCAPE, это первый экран,
- *      а не произвольная картинка).
+ * На старте .rig взят настолько огромным, что даже его проём
+ * с запасом перекрывает экран (computeLayout → fitOpeningCover):
+ * сама арка (она снаружи проёма) гарантированно за кадром, а
+ * панорама читается как самостоятельный полноэкранный мир. К концу
+ * отъезда .rig уменьшается до обычного финального размера.
+ *
+ * Фигура арки нарисована непрозрачной всегда — не проявляется
+ * прозрачностью. Это не упрощение, а гарантия: там, где по маске
+ * панорама вырезана под силуэт девушки, всегда есть чем это
+ * прикрыть, на любом масштабе, потому что фигура и маска — один
+ * и тот же кадр под одним и тем же transform.
  *
  * Вся арифметика вынесена в lib/scene.ts. Здесь — только измерения
- * реального экрана и запись результата в transform/mask/opacity.
+ * реального экрана и запись результата в transform .rig.
  */
 export default function ArchScene() {
   const sceneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const landscapeRef = useRef<HTMLImageElement>(null);
-  const archFigureRef = useRef<HTMLImageElement>(null);
-  const windowRef = useRef<HTMLDivElement>(null);
+  const rigRef = useRef<HTMLDivElement>(null);
   const choiceRef = useRef<HTMLDivElement>(null);
 
   const [selected, setSelected] = useState<string | null>(null);
 
   /* Вид в проёме следует за выбранным медальоном. Пока ни у одного
-     проекта нет своего кадра для окна, windowViewFor всегда отдаёт
-     вид по умолчанию — переключение готово и работает, только сегодня
-     оно ничего не меняет визуально: подставлять пока нечего. */
+     проекта нет своего кадра, windowViewFor всегда отдаёт вид по
+     умолчанию — переключение готово и работает, только сегодня оно
+     ничего не меняет визуально: подставлять пока нечего.
+     placeView — чистая функция констант кадра (не прогресса
+     прокрутки), поэтому смена медальона — обычный React-рендер,
+     без обращения к скролл-эффекту ниже. */
   const view = useMemo(() => windowViewFor(selected), [selected]);
-  const focus = view.focus ?? { x: 0.5, y: 0.5 };
+  const placement = useMemo(() => placeView(view), [view]);
 
   useIsomorphicLayoutEffect(() => {
     const scene = sceneRef.current;
     const stage = stageRef.current;
     const frame = frameRef.current;
-    const landscape = landscapeRef.current;
-    const archFigure = archFigureRef.current;
-    const windowEl = windowRef.current;
+    const rig = rigRef.current;
     const choice = choiceRef.current;
-    if (!scene || !stage || !frame || !landscape || !archFigure || !windowEl || !choice) return;
+    if (!scene || !stage || !frame || !rig || !choice) return;
 
     /* Тот же флаг, по которому CSS выбирает режим сцены: класс .js
        ставит синхронный скрипт в <head>, и только если движение
@@ -99,7 +93,6 @@ export default function ArchScene() {
 
     let layout: SceneLayout | null = null;
     let interactive: boolean | null = null;
-    let handedOff: boolean | null = null;
     let scheduled = false;
 
     const apply = () => {
@@ -110,41 +103,12 @@ export default function ArchScene() {
       /* Хвост прокрутки после SETTLE_AT — собранная сцена стоит на месте. */
       const progress = clamp(raw / SETTLE_AT);
 
-      /* Панорама: transform двигает и масштабирует кадр (откуда что
-         видно), маска — отдельно и всегда поверх — решает, сколько
-         от уже трансформированного кадра остаётся на экране. Ни то,
-         ни другое не трогает opacity: панорама не бледнеет. */
-      const rect = landscapeRectAt(progress, layout.landscapeStart, layout.landscapeEnd);
-      landscape.style.transform = transformFor(rect, LANDSCAPE);
-      landscape.style.opacity = '1';
-
-      const maskBox = maskRectAt(progress, layout.maskStart, layout.arch);
-      const scale = rect.width / LANDSCAPE.width;
-      /* mask-size/position считаются в СОБСТВЕННЫХ (нетрансформированных)
-         пикселях панорамы — тех же, где transform уже посчитал rect, —
-         поэтому просто переводим экранный прямоугольник маски в эту
-         систему координат делением на тот же масштаб. */
-      landscape.style.setProperty('--mask-w', `${(maskBox.width / scale).toFixed(2)}px`);
-      landscape.style.setProperty('--mask-h', `${(maskBox.height / scale).toFixed(2)}px`);
-      landscape.style.setProperty('--mask-x', `${((maskBox.x - rect.x) / scale).toFixed(2)}px`);
-      landscape.style.setProperty('--mask-y', `${((maskBox.y - rect.y) / scale).toFixed(2)}px`);
-
-      /* Передний план — обычная прозрачность, но короткая и ближе
-         к концу: см. PHASE.figureIn. */
-      const figureIn = phase(progress, PHASE.figureIn);
-      archFigure.style.transform = transformFor(layout.arch, ARCH, lerp(1.035, 1, figureIn));
-      archFigure.style.opacity = figureIn.toFixed(3);
-
-      /* Передача от маски панорамы к статичному window — обычное
-         переключение, не постепенный переход: оба слоя в этот момент
-         показывают одинаковые пиксели (см. HANDOFF_AT), поэтому щелчок
-         не виден. Плавный переход здесь означал бы новую полупрозрачность
-         ровно там, где её не должно быть. */
-      const next = progress >= HANDOFF_AT;
-      if (next !== handedOff) {
-        handedOff = next;
-        windowEl.style.opacity = next ? '1' : '0';
-      }
+      /* Единственный transform сцены: одна матрица одновременно
+         масштабирует панораму (её маска задана в тех же локальных
+         координатах .rig и растягивается вместе с ним) и фигуру
+         арки — см. заголовок lib/scene.ts. */
+      const rect = rigRectAt(progress, layout.rigStart, layout.arch);
+      rig.style.transform = transformFor(rect, ARCH);
 
       const reveal = phase(progress, PHASE.reveal);
       stage.style.setProperty('--reveal', reveal.toFixed(3));
@@ -182,10 +146,6 @@ export default function ArchScene() {
           height: frameBox.height,
         },
       );
-      /* window стоит смирно на месте арки — его transform зависит
-         только от layout (пересчитывается при resize), не от
-         прогресса прокрутки, поэтому ставим его здесь, а не в apply(). */
-      windowEl.style.transform = transformFor(layout.arch, ARCH);
       apply();
     };
 
@@ -216,52 +176,34 @@ export default function ArchScene() {
       style={{ '--scene-travel': SCENE_TRAVEL_VH } as React.CSSProperties}
     >
       <div className="stage" ref={stageRef}>
-        {/* ——— Слой 1: панорама первого экрана ————————————— */}
+        {/* ——— Статичный запасной вариант (без JS / reduced motion) ———
+            Отдельная, более простая раскладка: полноэкранная панорама
+            и готовая композиция «арка + вид» друг под другом, без
+            отъезда камеры. В режиме сцены (.js) не участвует —
+            скрыта целиком, см. app/scene.css. */}
         <div className="layer layer--landscape" aria-hidden="true">
           <img
             className="layer__img"
-            ref={landscapeRef}
-            src={LANDSCAPE.src}
+            src={DEFAULT_WINDOW_VIEW.src}
             alt=""
-            width={LANDSCAPE.width}
-            height={LANDSCAPE.height}
+            width={DEFAULT_WINDOW_VIEW.width}
+            height={DEFAULT_WINDOW_VIEW.height}
             fetchPriority="high"
             decoding="async"
-            style={
-              {
-                '--nat-w': `${LANDSCAPE.width}px`,
-                '--nat-h': `${LANDSCAPE.height}px`,
-              } as React.CSSProperties
-            }
           />
         </div>
 
-        {/* ——— Слой 2 и 3: фигура арки и вид про запас ——————
-            .window и .arch-figure наследуют --nat-w/--nat-h от общего
-            родителя, но двигаются каждый своим transform — window
-            неподвижен (ставится один раз при измерении), фигура едет
-            каждый кадр прокрутки. */}
-        <div
-          className="layer layer--arch"
-          style={
-            {
-              '--nat-w': `${ARCH.width}px`,
-              '--nat-h': `${ARCH.height}px`,
-            } as React.CSSProperties
-          }
-        >
+        <div className="layer layer--arch">
           <div
             className="window"
-            ref={windowRef}
             aria-hidden="true"
             style={{
               backgroundImage: `url(${view.src})`,
-              backgroundPosition: `${focus.x * 100}% ${focus.y * 100}%`,
+              backgroundPosition: `${(view.focus?.x ?? 0.5) * 100}% ${(view.focus?.y ?? 0.5) * 100}%`,
             }}
           />
           <img
             className="arch-figure"
-            ref={archFigureRef}
             src={ARCH.src}
             alt="Девушка в длинном платье сидит на подоконнике готической арки и смотрит на долину с рекой и городом на холме"
             width={ARCH.width}
@@ -270,7 +212,53 @@ export default function ArchScene() {
           />
         </div>
 
-        {/* ——— Слой 4: интерфейс ————————————————————————————
+        {/* ——— Сцена (только .js) ————————————————————————————
+            .rig — единственная анимация: один transform, который
+            каждый кадр прокрутки пишет эффект выше. Внутри —
+            панорама (обрезана маской точно по форме проёма) и
+            фигура арки, обе неподвижны относительно .rig. */}
+        <div
+          className="rig"
+          ref={rigRef}
+          aria-hidden="true"
+          style={
+            {
+              '--nat-w': `${ARCH.width}px`,
+              '--nat-h': `${ARCH.height}px`,
+            } as React.CSSProperties
+          }
+        >
+          <img
+            className="rig__landscape"
+            src={view.src}
+            alt=""
+            width={view.width}
+            height={view.height}
+            fetchPriority="high"
+            decoding="async"
+            style={
+              {
+                width: `${view.width}px`,
+                height: `${view.height}px`,
+                transform: placement.transform,
+                '--mask-w': placement.maskWidth,
+                '--mask-h': placement.maskHeight,
+                '--mask-x': placement.maskX,
+                '--mask-y': placement.maskY,
+              } as React.CSSProperties
+            }
+          />
+          <img
+            className="rig__figure"
+            src={ARCH.src}
+            alt="Девушка в длинном платье сидит на подоконнике готической арки и смотрит на долину с рекой и городом на холме"
+            width={ARCH.width}
+            height={ARCH.height}
+            decoding="async"
+          />
+        </div>
+
+        {/* ——— Интерфейс ————————————————————————————————————
             Три строки сетки: заголовок, пустая середина под арку,
             медальоны. Середину измеряет ResizeObserver — из неё и
             берётся размер и положение всей композиции, поэтому она
