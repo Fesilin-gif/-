@@ -222,14 +222,20 @@ export function phase(progress: number, [start, end]: readonly [number, number])
 
 /* ——— Раскладка ———————————————————————————————————————— */
 
-/** Кадр целиком внутри рамки, по центру. Ничего не обрезается. */
-export function fitContain(source: Size, box: Rect): Rect {
+/** Кадр целиком внутри рамки. Ничего не обрезается. anchor — где именно
+ *  внутри свободного места вдоль каждой оси встаёт кадр (0.5 — по
+ *  центру, как background-position: у fitCoverFocused). */
+export function fitContain(
+  source: Size,
+  box: Rect,
+  anchor: Point = { x: 0.5, y: 0.5 },
+): Rect {
   const scale = Math.min(box.width / source.width, box.height / source.height);
   const width = source.width * scale;
   const height = source.height * scale;
   return {
-    x: box.x + (box.width - width) / 2,
-    y: box.y + (box.height - height) / 2,
+    x: box.x + (box.width - width) * anchor.x,
+    y: box.y + (box.height - height) * anchor.y,
     width,
     height,
   };
@@ -241,11 +247,21 @@ export function fitContain(source: Size, box: Rect): Rect {
  * В файле арки вокруг рисунка широкие прозрачные поля. Если вписывать
  * файл целиком, арка выходит заметно мельче, чем могла бы. Полям
  * можно спокойно вылезать за рамку — снаружи всё равно прозрачно.
+ *
+ * anchor — см. fitContain; по вертикали финальный кадр арки специально
+ * взят чуть выше центра рамки (см. computeLayout) — по центру середина
+ * проёма (где сидит девушка) визуально казалась слишком низко.
  */
-export function fitContentContain(source: Size, content: Rect, box: Rect): Rect {
+export function fitContentContain(
+  source: Size,
+  content: Rect,
+  box: Rect,
+  anchor: Point = { x: 0.5, y: 0.5 },
+): Rect {
   const inner = fitContain(
     { width: source.width * content.width, height: source.height * content.height },
     box,
+    anchor,
   );
   const width = inner.width / content.width;
   const height = inner.height / content.height;
@@ -388,8 +404,12 @@ export type SceneLayout = {
  *   композиция сама подстраивается под длину заголовка, количество
  *   медальонов и любой размер шрифта.
  */
+/** Насколько выше геометрического центра рамки встаёт финальная арка
+ *  по вертикали — 0.5 было бы точно по центру, меньше — выше. */
+const ARCH_VERTICAL_ANCHOR = 0.4;
+
 export function computeLayout(viewport: Size, frame: Rect): SceneLayout {
-  const arch = fitContentContain(ARCH, ARCH.content, frame);
+  const arch = fitContentContain(ARCH, ARCH.content, frame, { x: 0.5, y: ARCH_VERTICAL_ANCHOR });
 
   const rigStart = fitOpeningCover(
     { x: 0, y: 0, width: viewport.width, height: viewport.height },
