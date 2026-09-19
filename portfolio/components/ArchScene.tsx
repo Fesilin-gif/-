@@ -6,6 +6,7 @@ import Medallions from '@/components/Medallions';
 import { windowViewFor } from '@/lib/projects';
 import {
   ARCH,
+  HANDOFF_AT,
   LANDSCAPE,
   PHASE,
   SCENE_TRAVEL_VH,
@@ -14,6 +15,7 @@ import {
   computeLayout,
   landscapeRectAt,
   lerp,
+  maskRectAt,
   phase,
   transformFor,
   type SceneLayout,
@@ -34,32 +36,40 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
  * источник прогресса: ничего не «проигрывается», поэтому сцена
  * одинаково идёт вперёд и назад и останавливается там, где остановили.
  *
- * Слои лежат снизу вверх:
- *   1. .layer--landscape — свободная панорама первого экрана: едет и
- *      тает по мере отъезда камеры (transform на transform, чистая
- *      геометрия из lib/scene.ts).
- *   2. .window (внутри .layer--arch) — вид в проёме: неподвижный CSS-
- *      фон, обрезанный точной маской проёма (arch-opening-mask.png),
- *      проявляется тем же движением, что и арка сверху.
- *   3. .arch-figure (тоже внутри .layer--arch) — передний план: PNG
- *      с прозрачным проёмом и прозрачным полем вокруг. Камень и
- *      девушка непрозрачны, всё остальное честно показывает то, что
- *      положено слоем 2.
+ * Это НЕ перекрёстная прозрачность. Панорама первого экрана (слой 1)
+ * всегда непрозрачна — она не тускнеет и не белеет ни на одном кадре.
+ * Единственное, что с ней происходит, — маска (CSS mask, не opacity),
+ * которая идёт в ногу с её собственным transform и стягивается от
+ * «весь экран» до точной формы проёма арки. Снаружи маски панорама
+ * жёстко обрывается, без полупрозрачного ореола.
  *
- * .window и .arch-figure — родные дети одного контейнера (.layer--arch)
- * с ОДНИМ transform на двоих, который ставит компонент. Поэтому маска
- * проёма всегда пиксель в пиксель совпадает с самой аркой, на любом
- * масштабе экрана, без отдельного пересчёта для вложенных слоёв.
+ * Слои лежат снизу вверх:
+ *   1. .layer--landscape — панорама. Едет по transform (отъезд камеры,
+ *      landscapeRectAt) и одновременно сжимается маской (maskRectAt)
+ *      до формы проёма. Непрозрачность всегда 1.
+ *   2. .arch-figure — передний план: девушка и камень, PNG с
+ *      прозрачным проёмом. Проявляется обычной прозрачностью, но
+ *      коротко и ближе к концу отъезда — когда маска панорамы уже
+ *      почти стянулась до формы проёма, открытого пейзажа вокруг
+ *      почти не остаётся, и прозрачность не читается как высветление.
+ *   3. .window — вид в проёме про запас: неподвижный CSS-фон под той
+ *      же маской. Скрыт весь отъезд; включается ровно в момент
+ *      HANDOFF_AT, когда маска панорамы уже точно совпала с формой
+ *      проёма — оба слоя в этот момент показывают одинаковые пиксели,
+ *      переключение не видно. Дальше именно window меняет вид по
+ *      выбору медальона (слой 1 — всегда LANDSCAPE, это первый экран,
+ *      а не произвольная картинка).
  *
  * Вся арифметика вынесена в lib/scene.ts. Здесь — только измерения
- * реального экрана и запись результата в transform.
+ * реального экрана и запись результата в transform/mask/opacity.
  */
 export default function ArchScene() {
   const sceneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const landscapeRef = useRef<HTMLImageElement>(null);
-  const archFigureRef = useRef<HTMLDivElement>(null);
+  const archFigureRef = useRef<HTMLImageElement>(null);
+  const windowRef = useRef<HTMLDivElement>(null);
   const choiceRef = useRef<HTMLDivElement>(null);
 
   const [selected, setSelected] = useState<string | null>(null);
@@ -77,8 +87,9 @@ export default function ArchScene() {
     const frame = frameRef.current;
     const landscape = landscapeRef.current;
     const archFigure = archFigureRef.current;
+    const windowEl = windowRef.current;
     const choice = choiceRef.current;
-    if (!scene || !stage || !frame || !landscape || !archFigure || !choice) return;
+    if (!scene || !stage || !frame || !landscape || !archFigure || !windowEl || !choice) return;
 
     /* Тот же флаг, по которому CSS выбирает режим сцены: класс .js
        ставит синхронный скрипт в <head>, и только если движение
@@ -88,6 +99,7 @@ export default function ArchScene() {
 
     let layout: SceneLayout | null = null;
     let interactive: boolean | null = null;
+    let handedOff: boolean | null = null;
     let scheduled = false;
 
     const apply = () => {
@@ -98,35 +110,51 @@ export default function ArchScene() {
       /* Хвост прокрутки после SETTLE_AT — собранная сцена стоит на месте. */
       const progress = clamp(raw / SETTLE_AT);
 
-      const archIn = phase(progress, PHASE.archIn);
-
-      const rect = landscapeRectAt(progress, layout);
+      /* Панорама: transform двигает и масштабирует кадр (откуда что
+         видно), маска — отдельно и всегда поверх — решает, сколько
+         от уже трансформированного кадра остаётся на экране. Ни то,
+         ни другое не трогает opacity: панорама не бледнеет. */
+      const rect = landscapeRectAt(progress, layout.landscapeStart, layout.landscapeEnd);
       landscape.style.transform = transformFor(rect, LANDSCAPE);
-      /* Панорама первого экрана уходит тем же окном, каким проявляются
-         арка и вид в проёме, — единая точка стыка вместо двух
-         рассинхронизированных, поэтому используем archIn напрямую,
-         а не отдельную фазу. */
-      landscape.style.opacity = (1 - archIn).toFixed(3);
-      /* Растушёвка идёт раньше прозрачности: как только кадр отходит
-         от краёв экрана, мягкая граница не даёт ему читаться вырезкой,
-         и заодно прячет расхождение двух иллюстраций. */
-      landscape.style.setProperty('--feather', phase(progress, PHASE.feather).toFixed(3));
+      landscape.style.opacity = '1';
 
-      /* Один transform на фигуру арки — им же делят window (вид
-         в проёме) и передний план (камень и девушка), поэтому маска
-         проёма всегда точно на месте, каким бы ни был масштаб. */
-      archFigure.style.transform = transformFor(layout.arch, ARCH, lerp(1.035, 1, archIn));
-      archFigure.style.opacity = archIn.toFixed(3);
+      const maskBox = maskRectAt(progress, layout.maskStart, layout.arch);
+      const scale = rect.width / LANDSCAPE.width;
+      /* mask-size/position считаются в СОБСТВЕННЫХ (нетрансформированных)
+         пикселях панорамы — тех же, где transform уже посчитал rect, —
+         поэтому просто переводим экранный прямоугольник маски в эту
+         систему координат делением на тот же масштаб. */
+      landscape.style.setProperty('--mask-w', `${(maskBox.width / scale).toFixed(2)}px`);
+      landscape.style.setProperty('--mask-h', `${(maskBox.height / scale).toFixed(2)}px`);
+      landscape.style.setProperty('--mask-x', `${((maskBox.x - rect.x) / scale).toFixed(2)}px`);
+      landscape.style.setProperty('--mask-y', `${((maskBox.y - rect.y) / scale).toFixed(2)}px`);
+
+      /* Передний план — обычная прозрачность, но короткая и ближе
+         к концу: см. PHASE.figureIn. */
+      const figureIn = phase(progress, PHASE.figureIn);
+      archFigure.style.transform = transformFor(layout.arch, ARCH, lerp(1.035, 1, figureIn));
+      archFigure.style.opacity = figureIn.toFixed(3);
+
+      /* Передача от маски панорамы к статичному window — обычное
+         переключение, не постепенный переход: оба слоя в этот момент
+         показывают одинаковые пиксели (см. HANDOFF_AT), поэтому щелчок
+         не виден. Плавный переход здесь означал бы новую полупрозрачность
+         ровно там, где её не должно быть. */
+      const next = progress >= HANDOFF_AT;
+      if (next !== handedOff) {
+        handedOff = next;
+        windowEl.style.opacity = next ? '1' : '0';
+      }
 
       const reveal = phase(progress, PHASE.reveal);
       stage.style.setProperty('--reveal', reveal.toFixed(3));
 
       /* Пока медальоны не проявились, они не должны ловить фокус:
          иначе табуляция уводит на невидимые кнопки. */
-      const next = reveal > 0.5;
-      if (next !== interactive) {
-        interactive = next;
-        if (next) choice.removeAttribute('inert');
+      const nextInteractive = reveal > 0.5;
+      if (nextInteractive !== interactive) {
+        interactive = nextInteractive;
+        if (nextInteractive) choice.removeAttribute('inert');
         else choice.setAttribute('inert', '');
       }
     };
@@ -154,6 +182,10 @@ export default function ArchScene() {
           height: frameBox.height,
         },
       );
+      /* window стоит смирно на месте арки — его transform зависит
+         только от layout (пересчитывается при resize), не от
+         прогресса прокрутки, поэтому ставим его здесь, а не в apply(). */
+      windowEl.style.transform = transformFor(layout.arch, ARCH);
       apply();
     };
 
@@ -204,14 +236,13 @@ export default function ArchScene() {
           />
         </div>
 
-        {/* ——— Слой 2: фигура арки ————————————————————————
-            .window и .arch-figure делят один transform (ставит
-            компонент на сам .layer--arch), поэтому маска проёма
-            всегда совпадает с аркой пиксель в пиксель — в любом
-            режиме, статичном или анимированном. */}
+        {/* ——— Слой 2 и 3: фигура арки и вид про запас ——————
+            .window и .arch-figure наследуют --nat-w/--nat-h от общего
+            родителя, но двигаются каждый своим transform — window
+            неподвижен (ставится один раз при измерении), фигура едет
+            каждый кадр прокрутки. */}
         <div
           className="layer layer--arch"
-          ref={archFigureRef}
           style={
             {
               '--nat-w': `${ARCH.width}px`,
@@ -221,6 +252,7 @@ export default function ArchScene() {
         >
           <div
             className="window"
+            ref={windowRef}
             aria-hidden="true"
             style={{
               backgroundImage: `url(${view.src})`,
@@ -229,6 +261,7 @@ export default function ArchScene() {
           />
           <img
             className="arch-figure"
+            ref={archFigureRef}
             src={ARCH.src}
             alt="Девушка в длинном платье сидит на подоконнике готической арки и смотрит на долину с рекой и городом на холме"
             width={ARCH.width}
@@ -237,7 +270,7 @@ export default function ArchScene() {
           />
         </div>
 
-        {/* ——— Слой 3: интерфейс ————————————————————————————
+        {/* ——— Слой 4: интерфейс ————————————————————————————
             Три строки сетки: заголовок, пустая середина под арку,
             медальоны. Середину измеряет ResizeObserver — из неё и
             берётся размер и положение всей композиции, поэтому она

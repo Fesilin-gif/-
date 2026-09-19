@@ -158,24 +158,6 @@
   z-index: 1;
 }
 
-.js .layer--arch {
-  z-index: 1;
-  /* Перекрывает inset:0 из общего .js .layer: фигура арки несёт СВОЙ
-     transform (ставит компонент), поэтому ей нужен явный натуральный
-     размер, а не растяжение на весь экран. .window и .arch-figure
-     внутри остаются на простых 100% — их не трогаем. */
-  top: 0;
-  left: 0;
-  right: auto;
-  bottom: auto;
-  width: var(--nat-w);
-  height: var(--nat-h);
-  aspect-ratio: auto;
-  transform-origin: 0 0;
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
 .js .layer__img {
   position: absolute;
   top: 0;
@@ -185,32 +167,76 @@
   height: var(--nat-h);
   max-width: none;
   transform-origin: 0 0;
-  /* До первого кадра сцены оба слоя скрыты: значения ставит
-     layout-эффект, то есть ещё до отрисовки. */
+  will-change: transform;
+}
+
+/* Панорама первого экрана видна с самого первого кадра сцены (JS
+   выставляет opacity:1 при первом же измерении, до отрисовки) —
+   в отличие от переднего плана арки, ей нечего скрывать перед стартом. */
+.js .layer--landscape .layer__img {
+  opacity: 1;
+}
+
+/* Маска панорамы — упрощённый контур проёма (arch-outline-mask.png,
+   без выреза под силуэт девушки — см. lib/scene.ts, ARCH_OUTLINE_MASK_SRC,
+   почему для ДВИЖУЩЕГОСЯ слоя это осознанный выбор, а не недосмотр),
+   стянутая или растянутая до нужного размера через --mask-w/h/x/y. Это
+   жёсткий вырез, не полупрозрачность: снаружи маски панорама не
+   существует, внутри остаётся такой же яркой. Начальные значения
+   (100%/100%, 0 0 — то есть маска на весь натуральный кадр панорамы)
+   действуют только до первого apply(); тот же самый кадр layout-эффекта
+   успевает переписать их раньше отрисовки. */
+.js .layer--landscape .layer__img {
+  --mask-w: 100%;
+  --mask-h: 100%;
+  --mask-x: 0;
+  --mask-y: 0;
+  -webkit-mask-image: url('/media/arch-outline-mask.png');
+  mask-image: url('/media/arch-outline-mask.png');
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: var(--mask-w) var(--mask-h);
+  mask-size: var(--mask-w) var(--mask-h);
+  -webkit-mask-position: var(--mask-x) var(--mask-y);
+  mask-position: var(--mask-x) var(--mask-y);
+}
+
+/* Передний план арки: невидим на первом кадре сцены (JS проявляет
+   его прозрачностью — коротко и ближе к концу отъезда, см.
+   PHASE.figureIn), едет собственным transform каждый кадр прокрутки. */
+.js .arch-figure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Явно гасим inset:0 из статичного правила ниже по коду (иначе
+     right/bottom:0 остаются в силе рядом с width/height и спор
+     решает неявное правило браузера для переопределённых блоков) */
+  right: auto;
+  bottom: auto;
+  width: var(--nat-w);
+  height: var(--nat-h);
+  max-width: none;
+  transform-origin: 0 0;
   opacity: 0;
   will-change: transform, opacity;
 }
 
-/* Растушёвка краёв панорамы.
-   --feather: 0 — кадр без маски, полный экран; 1 — мягкие края.
-
-   Проценты в размере градиента считаются от сторон кадра, поэтому
-   размер эллипса и точка чёрного едут вместе:
-     75% — эллипс заведомо накрывает углы, маска ничего не делает;
-     55% + чёрное до 20% — край кадра растворяется почти полностью.
-   Промежуточные значения дают ровное нарастание, а не рывок в конце. */
-.js .layer--landscape .layer__img {
-  --feather: 0;
-  -webkit-mask-image: radial-gradient(
-    ellipse calc(75% - var(--feather) * 20%) calc(75% - var(--feather) * 20%) at 50% 50%,
-    #000 calc(100% - var(--feather) * 80%),
-    transparent 100%
-  );
-  mask-image: radial-gradient(
-    ellipse calc(75% - var(--feather) * 20%) calc(75% - var(--feather) * 20%) at 50% 50%,
-    #000 calc(100% - var(--feather) * 80%),
-    transparent 100%
-  );
+/* Вид в проёме про запас: неподвижен (transform ставится один раз при
+   измерении, не каждый кадр), скрыт весь отъезд и включается ровно
+   в HANDOFF_AT — обычным переключением, не переходом: маска панорамы
+   к этому моменту уже точно совпала с формой проёма, оба слоя
+   показывают одинаковые пиксели. */
+.js .window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: auto;
+  width: var(--nat-w);
+  height: var(--nat-h);
+  max-width: none;
+  transform-origin: 0 0;
+  opacity: 0;
 }
 
 /* Заголовок и медальоны появляются в самом конце отъезда */
