@@ -352,8 +352,16 @@ const OPENING_RECT_SAFE: Rect = {
  * это экран, а он может стать чуть больше проёма без предупреждения
  * (например, сразу после resize, до пересчёта раскладки) — без
  * запаса в этот момент по краю мелькнула бы полоска белого холста.
+ *
+ * anchor — где именно внутри рамки встаёт проём (см. fitContain).
+ * По вертикали здесь та же точка, что и у финального кадра арки
+ * (ARCH_VERTICAL_ANCHOR) — если бы тут был центр экрана, а кадр
+ * арки в конце едет выше центра, опорная точка отъезда (OPENING_CENTER,
+ * см. ниже) на середине пути ещё не успевала бы подняться настаточно
+ * высоко: свод арки на добрую половину прокрутки срезало верхним
+ * краем экрана. Один и тот же перекос с самого начала убирает это.
  */
-function fitOpeningCover(box: Rect, margin = 1): Rect {
+function fitOpeningCover(box: Rect, margin = 1, anchor: Point = { x: 0.5, y: 0.5 }): Rect {
   const openingNat: Size = {
     width: OPENING_RECT_SAFE.width * ARCH.width,
     height: OPENING_RECT_SAFE.height * ARCH.height,
@@ -366,8 +374,8 @@ function fitOpeningCover(box: Rect, margin = 1): Rect {
   const archHeight = ARCH.height * scale;
   const openingWidth = OPENING_RECT_SAFE.width * archWidth;
   const openingHeight = OPENING_RECT_SAFE.height * archHeight;
-  const openingX = box.x + (box.width - openingWidth) / 2;
-  const openingY = box.y + (box.height - openingHeight) / 2;
+  const openingX = box.x + (box.width - openingWidth) * anchor.x;
+  const openingY = box.y + (box.height - openingHeight) * anchor.y;
   return {
     x: openingX - OPENING_RECT_SAFE.x * archWidth,
     y: openingY - OPENING_RECT_SAFE.y * archHeight,
@@ -408,12 +416,29 @@ export type SceneLayout = {
  *  по вертикали — 0.5 было бы точно по центру, меньше — выше. */
 const ARCH_VERTICAL_ANCHOR = 0.4;
 
+/**
+ * То же самое, но для СТАРТА отъезда (rigStart), и гораздо резче.
+ *
+ * .rig на старте настолько огромен (много выше экрана), что свод арки
+ * и подол платья физически не помещаются в экран одновременно — при
+ * любой точке привязки что-то одно обрезано верхним/нижним краем.
+ * Раз выбирать всё равно приходится, лучше обрезать подол (он в любом
+ * случае ещё не виден целиком — девушка только проявляется, см.
+ * PHASE.figureIn), чем свод: подпись «тут арка должна быть выше»
+ * была именно про срезанный свод в середине прокрутки. Чем ближе эта
+ * точка к верху экрана на старте, тем раньше (по прогрессу) свод
+ * перестаёт обрезаться — сама точка при этом всё равно едет к
+ * ARCH_VERTICAL_ANCHOR линейно, так что рывка нет.
+ */
+const RIG_START_VERTICAL_ANCHOR = 0;
+
 export function computeLayout(viewport: Size, frame: Rect): SceneLayout {
   const arch = fitContentContain(ARCH, ARCH.content, frame, { x: 0.5, y: ARCH_VERTICAL_ANCHOR });
 
   const rigStart = fitOpeningCover(
     { x: 0, y: 0, width: viewport.width, height: viewport.height },
     1.2,
+    { x: 0.5, y: RIG_START_VERTICAL_ANCHOR },
   );
 
   return { arch, rigStart };
