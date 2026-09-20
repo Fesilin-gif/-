@@ -11,7 +11,7 @@ export default function Directions() {
     <section className="directions" id="directions">
       <div className="shell">
         <div className="section-head reveal">
-          <span className="section-head__index">02</span>
+          <span className="section-head__index">2</span>
           <span className="label">Направления</span>
         </div>
       </div>

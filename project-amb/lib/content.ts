@@ -7,20 +7,19 @@
  * ЗАМЕНИТЕ на реальные данные студии перед публикацией.
  */
 export const CONTACTS = {
-  phoneLabel: '+7 (900) 000-00-00',
-  phoneHref: 'tel:+79000000000',
+  phoneLabel: '+7 929 911-69-99',
+  phoneHref: 'tel:+79299116999',
   email: 'hello@projectamb.ru',
   telegramLabel: '@projectamb',
   telegramHref: 'https://t.me/projectamb',
   whatsappLabel: 'WhatsApp',
-  whatsappHref: 'https://wa.me/79000000000',
+  whatsappHref: 'https://wa.me/79299116999',
   city: 'Москва и Московская область',
 } as const;
 
 export const NAV = [
-  { label: 'Проекты', href: '/#projects' },
   { label: 'Услуги', href: '/#directions' },
-  { label: 'О нас', href: '/#team' },
+  { label: 'Подход', href: '/#approach' },
   { label: 'Как мы работаем', href: '/#process' },
   { label: 'Контакты', href: '/#contact' },
 ] as const;
@@ -31,12 +30,12 @@ export const HERO = {
   lead: 'Декорации для свадеб, детских праздников, шоу и частных мероприятий.',
   note: 'От идеи и визуальной концепции до изготовления и монтажа.',
   primary: { label: 'Обсудить проект', href: '/#contact' },
-  secondary: { label: 'Смотреть проекты', href: '/#projects' },
+  secondary: { label: 'Смотреть направления', href: '/#directions' },
   rail: 'PROJECT AMB — decor & production',
 } as const;
 
 export const MANIFEST = {
-  index: '00',
+  index: '1',
   label: 'Подход',
   lead:
     'PROJECT AMB проектирует и производит декорации для событий. Мы отвечаем не только за то, как пространство выглядит на референсе, но и за то, как оно собирается, держится и работает в день мероприятия.',
@@ -138,7 +137,7 @@ export const PROJECTS = [
 ] as const;
 
 export const TRUST = {
-  index: '04',
+  index: '3',
   label: 'Почему нам доверяют',
   title: 'Берём на себя всё, что стоит между идеей и готовым пространством.',
   points: [
@@ -172,7 +171,7 @@ export const STATEMENT = {
 } as const;
 
 export const PROCESS = {
-  index: '06',
+  index: '4',
   label: 'Как мы работаем',
   title: 'Пять шагов от первого сообщения до собранного пространства.',
   steps: [
@@ -184,22 +183,8 @@ export const PROCESS = {
   ],
 } as const;
 
-export const TEAM = {
-  index: '07',
-  label: 'Команда',
-  title: 'Люди, которые превращают идею в пространство.',
-  lead: 'Небольшая команда полного цикла: над проектом работают конкретные люди, а не абстрактный отдел.',
-  members: [
-    { role: 'Арт-директор', slot: 'team-01', text: 'Концепция, визуальный язык, референсы и итоговая картинка события.' },
-    { role: 'Продюсер проекта', slot: 'team-02', text: 'Сроки, смета, площадка, согласования и вся коммуникация с заказчиком.' },
-    { role: 'Декоратор', slot: 'team-03', text: 'Флористика, текстиль, детали и финальная сборка на площадке.' },
-    { role: 'Монтажная команда', slot: 'team-04', text: 'Конструктив, логистика, монтаж и демонтаж в согласованное окно.' },
-  ],
-  note: 'Фотографии команды заменяются в public/media/team-*.webp.',
-} as const;
-
 export const CONTACT = {
-  index: '08',
+  index: '5',
   label: 'Заявка',
   title: 'Обсудим ваше мероприятие?',
   lead: 'Расскажите о событии — предложим идею и поможем превратить её в готовое пространство.',
