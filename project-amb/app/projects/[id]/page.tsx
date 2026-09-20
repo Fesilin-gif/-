@@ -36,8 +36,8 @@ export default async function ProjectPage({ params }: Params) {
     <article className="project-page">
       <div className="shell">
         <div className="project-page__head">
-          <a className="link link--back" href="/#projects">
-            Все проекты
+          <a className="link link--back" href="/">
+            На главную
           </a>
           <h1 className="display project-page__title">{project.title}</h1>
         </div>
