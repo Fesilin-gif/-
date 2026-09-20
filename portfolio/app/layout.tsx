@@ -54,9 +54,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: MOTION_FLAG }} />
       </head>
       <body>
-        <a className="skip-link" href="#choice">
-          К выбору проекта
-        </a>
         <main>{children}</main>
       </body>
     </html>

@@ -2,7 +2,6 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import Medallions from '@/components/Medallions';
 import {
   ARCH,
   ARCH_MASK_SRC,
@@ -39,8 +38,10 @@ const FRAME_PAD_BOTTOM = 0.18;
 /**
  * Заставка портфолио: на белом фоне появляется арка с девушкой (вид
  * в проёме уже виден), затем сама, без участия посетителя, играет
- * влёт камеры в окно — и открывает основной сайт (заголовок и ряд
- * медальонов).
+ * влёт камеры в окно — и от неё остаётся только сам пейзаж, во весь
+ * экран. Ни заголовка, ни выбора проектов здесь нет — чем заканчивать
+ * страницу, пока в lib/projects.ts не заполнены настоящие слоты, ещё
+ * предстоит решить отдельно.
  *
  * Как это устроено
  * ----------------
@@ -57,10 +58,8 @@ const FRAME_PAD_BOTTOM = 0.18;
  * огромен, что пейзаж внутри проёма занимает весь экран, как самый
  * обычный полноэкранный фон. Дойдя до конца, .rig и панорама
  * ЗАСТЫВАЮТ в этом положении (position: fixed, тот же элемент
- * <img>, тот же файл — вторая копия пейзажа нигде не заводится) и
- * работают неподвижной подложкой на весь первый экран, а заголовок
- * и медальоны — обычным, дальше идущим по потоку содержимым, которое
- * при прокрутке наезжает на эту подложку сверху (см. app/scene.css).
+ * <img>, тот же файл — вторая копия пейзажа нигде не заводится) —
+ * это и есть весь итог страницы.
  *
  * Готовность и запуск
  * --------------------
@@ -75,12 +74,11 @@ const FRAME_PAD_BOTTOM = 0.18;
  *
  * Пока идёт заставка (ожидание готовности или сам влёт), прокрутка
  * страницы заблокирована — случайный скролл не должен смешать кадр
- * влёта с появлением заголовка и медальонов. При
- * prefers-reduced-motion (или без JS) класс .js на <html> не
- * появляется вовсе (см. layout.tsx), и CSS переключает всю разметку
- * в статичный режим: заставки и влёта нет, сразу виден основной сайт
- * — тот же <img> с пейзажем, просто обычной картинкой в потоке
- * страницы, без .rig и маски.
+ * влёта. При prefers-reduced-motion (или без JS) класс .js на <html>
+ * не появляется вовсе (см. layout.tsx), и CSS переключает всю
+ * разметку в статичный режим: заставки и влёта нет, сразу виден
+ * пейзаж — тот же <img>, просто обычной картинкой на весь экран, без
+ * .rig и маски.
  */
 export default function Intro() {
   const introRef = useRef<HTMLDivElement>(null);
@@ -95,7 +93,6 @@ export default function Intro() {
   const finishFlightRef = useRef<() => void>(() => {});
 
   const [phaseState, setPhaseState] = useState<Phase>('loading');
-  const [selected, setSelected] = useState<string | null>(null);
   const [ready, setReady] = useState({ figure: false, landscape: false, mask: false });
   const allReady = ready.figure && ready.landscape && ready.mask;
 
@@ -274,79 +271,63 @@ export default function Intro() {
   }
 
   return (
-    <>
-      <div
-        className="intro"
-        ref={introRef}
-        data-phase={phaseState}
-        inert={phaseState === 'done'}
-        style={
-          {
-            '--nat-w': `${ARCH.width}px`,
-            '--nat-h': `${ARCH.height}px`,
-          } as React.CSSProperties
-        }
-      >
-        <div className="rig" ref={rigRef}>
-          <div className="rig__window">
-            <img
-              ref={landscapeRef}
-              className="rig__landscape"
-              src={VIEW.src}
-              alt=""
-              width={VIEW.width}
-              height={VIEW.height}
-              fetchPriority="high"
-              decoding="async"
-              /* object-position — только для запасного (без JS) режима,
-                 где панорама лежит обычной cover-картинкой, а не
-                 transform'ом; в режиме заставки ни на что не влияет. */
-              style={{ objectPosition: `${FOCUS.x * 100}% ${FOCUS.y * 100}%` }}
-              onLoad={() => setReady((r) => ({ ...r, landscape: true }))}
-              onError={() => setReady((r) => ({ ...r, landscape: true }))}
-            />
-          </div>
+    <div
+      className="intro"
+      ref={introRef}
+      data-phase={phaseState}
+      inert={phaseState === 'done'}
+      style={
+        {
+          '--nat-w': `${ARCH.width}px`,
+          '--nat-h': `${ARCH.height}px`,
+        } as React.CSSProperties
+      }
+    >
+      <div className="rig" ref={rigRef}>
+        <div className="rig__window">
           <img
-            ref={figureRef}
-            className="rig__figure"
-            src={ARCH.src}
-            alt="Девушка в зелёном платье сидит спиной к зрителю на подоконнике готической арки, глядя в проём наружу"
-            width={ARCH.width}
-            height={ARCH.height}
+            ref={landscapeRef}
+            className="rig__landscape"
+            src={VIEW.src}
+            alt=""
+            width={VIEW.width}
+            height={VIEW.height}
             fetchPriority="high"
             decoding="async"
-            onLoad={() => setReady((r) => ({ ...r, figure: true }))}
-            onError={() => setReady((r) => ({ ...r, figure: true }))}
+            /* object-position — только для запасного (без JS) режима,
+               где панорама лежит обычной cover-картинкой, а не
+               transform'ом; в режиме заставки ни на что не влияет. */
+            style={{ objectPosition: `${FOCUS.x * 100}% ${FOCUS.y * 100}%` }}
+            onLoad={() => setReady((r) => ({ ...r, landscape: true }))}
+            onError={() => setReady((r) => ({ ...r, landscape: true }))}
           />
         </div>
-
-        <div className="intro__curtain" aria-hidden="true" />
-
-        <div className="intro__loading" aria-live="polite">
-          <p className="intro__loading-text">Загрузка…</p>
-          <div className="intro__loading-track" aria-hidden="true">
-            <div className="intro__loading-bar" />
-          </div>
-        </div>
-
-        <button className="intro__skip" type="button" onClick={skip}>
-          Пропустить
-        </button>
+        <img
+          ref={figureRef}
+          className="rig__figure"
+          src={ARCH.src}
+          alt="Девушка в зелёном платье сидит спиной к зрителю на подоконнике готической арки, глядя в проём наружу"
+          width={ARCH.width}
+          height={ARCH.height}
+          fetchPriority="high"
+          decoding="async"
+          onLoad={() => setReady((r) => ({ ...r, figure: true }))}
+          onError={() => setReady((r) => ({ ...r, figure: true }))}
+        />
       </div>
 
-      <div className="site">
-        <div className="site__hero-space" aria-hidden="true" />
+      <div className="intro__curtain" aria-hidden="true" />
 
-        <div className="site__content">
-          <header className="site__head">
-            <h1 className="site__title">Какой ваш выбор?</h1>
-          </header>
-
-          <div className="site__choice" id="choice">
-            <Medallions selected={selected} onSelect={setSelected} />
-          </div>
+      <div className="intro__loading" aria-live="polite">
+        <p className="intro__loading-text">Загрузка…</p>
+        <div className="intro__loading-track" aria-hidden="true">
+          <div className="intro__loading-bar" />
         </div>
       </div>
-    </>
+
+      <button className="intro__skip" type="button" onClick={skip}>
+        Пропустить
+      </button>
+    </div>
   );
 }

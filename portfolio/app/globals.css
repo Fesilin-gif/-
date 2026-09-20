@@ -73,20 +73,3 @@ h1 {
   outline-offset: 5px;
   border-radius: 4px;
 }
-
-.skip-link {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  z-index: 100;
-  padding: 10px 16px;
-  background: var(--ink);
-  color: var(--canvas);
-  border-radius: 6px;
-  text-decoration: none;
-  transform: translateY(-200%);
-}
-
-.skip-link:focus-visible {
-  transform: none;
-}
