@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { PROJECTS, ordinal, type Project } from '@/lib/projects';
 
 type Props = {
-  /** id выбранного медальона: помимо визуальной отметки, определяет
-   *  вид в проёме арки (см. ArchScene). */
+  /** id выбранного медальона — только визуальная отметка (кольцо
+   *  вокруг диска). Окно арки существует лишь внутри заставки и к
+   *  моменту, когда медальоны становятся видны, уже не на странице —
+   *  см. «О поле windowView у проекта» в README.md. */
   selected: string | null;
   onSelect: (id: string) => void;
 };
