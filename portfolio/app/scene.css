@@ -98,19 +98,27 @@
   will-change: transform;
 }
 
-/* Занавеска: сплошной холст поверх .rig, пока идёт ожидание — см. её
-   заголовок выше. Исчезает разом, как только начинается сам влёт. */
+/* Занавеска: сплошной холст поверх .rig — см. её заголовок выше.
+   Закрывает арку только на те доли секунды между первой отрисовкой
+   разметки и моментом, когда Intro.tsx успел посчитать стартовый кадр
+   и убедиться, что маска проёма готова (.intro--arch-visible, см.
+   компонент) — не всё время ожидания. Дальше арка сама плавно
+   проявляется здесь же, без скачка в момент начала влёта. */
 .js .intro__curtain {
   display: block;
   position: absolute;
   inset: 0;
   z-index: 1;
   background: var(--canvas);
+  opacity: 1;
+  transition: opacity 620ms var(--ease-out);
 }
 
+.js .intro--arch-visible .intro__curtain,
 .js .intro[data-phase='flying'] .intro__curtain,
 .js .intro[data-phase='done'] .intro__curtain {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Обёртка панорамы: ровно натуральный кадр арки — та же система
