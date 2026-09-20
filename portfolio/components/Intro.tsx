@@ -29,8 +29,8 @@ const VIEW = DEFAULT_WINDOW_VIEW;
 const FOCUS = VIEW.focus ?? { x: 0.5, y: 0.5 };
 
 /* Отступы вокруг стартового (контейнерного) кадра арки, доля экрана:
-   по бокам и сверху — воздух, снизу — место под «Загрузка…» и кнопку
-   «Пропустить», чтобы подол платья их не перекрывал. */
+   по бокам и сверху — воздух, снизу — место под «Загрузка…», чтобы
+   подол платья её не перекрывал. */
 const FRAME_PAD_SIDE = 0.08;
 const FRAME_PAD_TOP = 0.06;
 const FRAME_PAD_BOTTOM = 0.18;
@@ -67,10 +67,12 @@ const FRAME_PAD_BOTTOM = 0.18;
  * подстраховкой таймером на случай, если какая-то так и не загрузится)
  * — на экране только белый фон и надпись «Загрузка…» с тонкой
  * индикаторной полоской (без выдуманных процентов, полоска просто
- * бежит). Как только всё готово — арка проявляется, полоска исчезает,
- * и через короткую паузу сам, без клика и без прокрутки, начинается
- * влёт. Кнопка «Пропустить» работает в любой момент этого пути и
- * сразу ставит сцену в конечное положение.
+ * бежит). Экран «Загрузка…» держится не меньше INTRO.minLoadingMs
+ * (считая с открытия страницы, а не с готовности картинок) — на
+ * быстрой сети или с картинками из кэша браузера готовность может
+ * наступить почти сразу, и без этого порога посетитель не успевает
+ * понять, что вообще происходит, прежде чем экран сменится. Дальше,
+ * без клика и без прокрутки, сам начинается влёт.
  *
  * Пока идёт заставка (ожидание готовности или сам влёт), прокрутка
  * страницы заблокирована — случайный скролл не должен смешать кадр
@@ -88,9 +90,9 @@ export default function Intro() {
 
   const phaseRef = useRef<Phase>('loading');
   const motionAllowedRef = useRef(true);
-  /** Пока идёт влёт — мгновенно ставит сцену в конечное положение
-   *  и завершает его; вне влёта — no-op. Задаёт сам эффект влёта. */
-  const finishFlightRef = useRef<() => void>(() => {});
+  /** Момент открытия страницы — точка отсчёта для INTRO.minLoadingMs
+   *  (не момент готовности картинок, см. заголовок компонента). */
+  const mountedAtRef = useRef(0);
 
   const [phaseState, setPhaseState] = useState<Phase>('loading');
   const [ready, setReady] = useState({ figure: false, landscape: false, mask: false });
@@ -113,6 +115,7 @@ export default function Intro() {
      обработчик, и onLoad в этом случае никогда не сработает. complete
      — обычное свойство DOM, ему всё равно, когда его прочли. */
   useIsomorphicLayoutEffect(() => {
+    mountedAtRef.current = Date.now();
     const allowed = document.documentElement.classList.contains('js');
     motionAllowedRef.current = allowed;
     if (!allowed) {
@@ -147,9 +150,8 @@ export default function Intro() {
   /* Раскладка на текущий момент: стартовый и конечный кадр арки,
      стартовое и конечное местное положение панорамы — и функция apply,
      которая по произвольному t (0..1) пишет transform/opacity в DOM.
-     Меряет экран заново при каждом вызове — вызывается либо прямо
-     перед стартом влёта, либо при мгновенном прыжке в конец
-     («Пропустить» во время ожидания). */
+     Меряет экран заново при каждом вызове — вызывается прямо перед
+     стартом влёта. */
   function prepareFlight(): ((rawT: number) => void) | null {
     const rig = rigRef.current;
     const landscape = landscapeRef.current;
@@ -189,13 +191,15 @@ export default function Intro() {
     };
   }
 
-  /* Как только всё готово — короткая пауза (дать глазу заметить арку
-     и девушку), затем сам влёт. */
+  /* Как только всё готово — влёт, но не раньше INTRO.minLoadingMs
+     с открытия страницы (см. заголовок компонента). */
   useEffect(() => {
     if (phaseRef.current !== 'loading' || !allReady) return;
+    const elapsed = Date.now() - mountedAtRef.current;
+    const remaining = Math.max(0, INTRO.minLoadingMs - elapsed);
     const timeout = window.setTimeout(() => {
       if (phaseRef.current === 'loading') setPhase('flying');
-    }, INTRO.pauseMs);
+    }, remaining);
     return () => window.clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allReady]);
@@ -226,13 +230,6 @@ export default function Intro() {
       }
     };
 
-    finishFlightRef.current = () => {
-      cancelled = true;
-      if (rafId) cancelAnimationFrame(rafId);
-      apply(1);
-      setPhase('done');
-    };
-
     apply(0);
     rafId = requestAnimationFrame(tick);
 
@@ -245,7 +242,7 @@ export default function Intro() {
 
   /* Пока заставка играет (ожидание готовности или сам влёт) —
      прокрутка страницы заблокирована, иначе случайный скролл
-     смешает кадр влёта с появлением заголовка и медальонов. */
+     смешает кадр влёта. */
   useEffect(() => {
     if (phaseState === 'done') return;
     const html = document.documentElement;
@@ -255,20 +252,6 @@ export default function Intro() {
       html.style.overflow = previous;
     };
   }, [phaseState]);
-
-  function skip() {
-    if (phaseRef.current === 'done') return;
-    if (phaseRef.current === 'flying') {
-      finishFlightRef.current();
-      return;
-    }
-    /* Пропуск во время ожидания: минуя и загрузку, и сам влёт, сразу
-       ставим сцену в конечное положение (если экран уже можно
-       измерить — на практике он к этому моменту всегда измерим). */
-    const apply = prepareFlight();
-    apply?.(1);
-    setPhase('done');
-  }
 
   return (
     <div
@@ -324,10 +307,6 @@ export default function Intro() {
           <div className="intro__loading-bar" />
         </div>
       </div>
-
-      <button className="intro__skip" type="button" onClick={skip}>
-        Пропустить
-      </button>
     </div>
   );
 }

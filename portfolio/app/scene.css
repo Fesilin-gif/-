@@ -45,7 +45,6 @@
 
 .rig__figure,
 .intro__loading,
-.intro__skip,
 .intro__curtain {
   display: none;
 }
@@ -216,42 +215,6 @@
   100% {
     transform: translateX(320%);
   }
-}
-
-/* Кнопка «Пропустить» — работает и пока идёт ожидание, и во время
-   самого влёта; исчезает вместе с остальной заставкой. */
-.js .intro__skip {
-  display: block;
-  position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  right: max(16px, env(safe-area-inset-right));
-  z-index: 2;
-  appearance: none;
-  border: 0;
-  margin: 0;
-  padding: 8px 14px;
-  background: rgba(254, 254, 254, 0.72);
-  backdrop-filter: blur(6px);
-  border-radius: 999px;
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: var(--fs-label);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  opacity: 1;
-  transition:
-    opacity 240ms var(--ease-out),
-    color 180ms var(--ease-out);
-}
-
-.js .intro__skip:hover {
-  color: var(--ink);
-}
-
-.js .intro[data-phase='done'] .intro__skip {
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* ——— Медальоны ————————————————————————————————————————— */
